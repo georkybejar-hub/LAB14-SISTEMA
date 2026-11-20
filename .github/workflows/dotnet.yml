@@ -1,0 +1,62 @@
+name: Build and Deploy .NET Application
+
+on:
+  push:
+    branches:
+      - main   # Se ejecuta automaticamente al subir cambios a main
+
+permissions:
+  contents: read
+  packages: write   # permite publicar la imagen en GitHub Container Registry
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Lab13ClosedXML.sln
+
+      - name: Build application
+        run: dotnet build Lab13ClosedXML.sln --configuration Release --no-restore
+
+      - name: Publish application
+        run: dotnet publish Lab13ClosedXML/Lab13ClosedXML.csproj --configuration Release --output ./published
+
+      - name: Upload published artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-app
+          path: ./published
+
+      # Imagen de contenedor generada por el SDK de .NET (sin Dockerfile)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish container image
+        run: >
+          dotnet publish Lab13ClosedXML/Lab13ClosedXML.csproj
+          --configuration Release
+          /t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=georkybejar-hub/lab14-sistema
+          -p:ContainerImageTag=latest
+
+      # Despliegue: Render descarga la nueva imagen
+      - name: Deploy to Render
+        if: ${{ env.RENDER_DEPLOY_HOOK != '' }}
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK"

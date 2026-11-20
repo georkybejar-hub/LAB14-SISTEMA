@@ -1,0 +1,6 @@
+@Lab13ClosedXML_HostAddress = http://localhost:5187
+
+GET {{Lab13ClosedXML_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
